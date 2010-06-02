@@ -56,6 +56,8 @@ class Compressor(object):
         basename = url.replace(self.storage.base_url, "", 1)
         if not self.storage.exists(basename):
             raise UncompressableFileError('"%s" does not exist' % self.storage.path(basename))
+        if hasattr(self.storage, 'source_path'):
+            return self.storage.source_path(basename)
         return self.storage.path(basename)
 
     @property
