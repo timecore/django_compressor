@@ -459,6 +459,88 @@ body {
         file_path = os.path.abspath(os.path.join(file_dir, '../media/cache/css/5b3a1d97baec.css'))
         actual_content = open(file_path, 'r').read().replace('\n', '').replace(' ', '')
 
-        import pdb;pdb.set_trace()
+        self.assertEqual(expected_content.strip(' '), 
+                         actual_content.strip(' '))
+                         
+    def test_js_tag_with_app_savvy_storage(self):
+        template = u"""{% load compress %}{% compress js %}
+        <script src="{{ MEDIA_URL }}js/one.js" type="text/javascript"></script>
+        <script type="text/javascript">var testJsInline = 'abc';</script>
+        <script src="{{ MEDIA_URL }}js/nonasc.js" type="text/javascript"></script>
+        {% endcompress %}
+        """
+        context = { 'MEDIA_URL': settings.MEDIA_URL }
+        out = u'<script type="text/javascript" src="/media/CACHE/js/c399a877b84d.js" charset="utf-8"></script>'
+        self.assertEqual(out, render(template, context))
+        
+    def test_can_get_js_from_one_app(self):
+        template = u"""{% load compress %}{% compress js %}
+        <script src="/media/core/js/test1.js" type="text/javascript"></script>
+        {% endcompress %}
+        """
+        context = { 'MEDIA_URL': settings.MEDIA_URL }
+        out = u'<script type="text/javascript" src="/media/CACHE/js/a766c646fe40.js" charset="utf-8"></script>'
+        self.assertEqual(out, render(template, context))
+        
+        expected_content = u"""
+var test='abc';
+        """.replace('\n', '')
+
+        storage = get_storage_class(settings.STORAGE)
+        file_dir = os.path.dirname(__file__)
+        file_path = os.path.abspath(os.path.join(file_dir, '../media/cache/js/a766c646fe40.js'))
+        actual_content = open(file_path, 'r').read().replace('\n', '')
+        
+        self.assertEqual(expected_content.strip(' '), 
+                         actual_content.strip(' '))
+
+    def test_can_get_js_from_many_apps(self):
+        template = u"""{% load compress %}{% compress js %}
+        <script src="/media/core/js/test1.js" type="text/javascript"></script>
+        <script src="/media/otherapp/js/test1.js" type="text/javascript"></script>
+        {% endcompress %}
+        """
+        context = { 'MEDIA_URL': settings.MEDIA_URL }
+        out = u'<script type="text/javascript" src="/media/CACHE/js/a02847964696.js" charset="utf-8"></script>'
+        self.assertEqual(out, render(template, context))
+        
+        expected_content = u"""
+var test='abc';var test1='kpj';
+        """.replace('\n', '')
+
+        storage = get_storage_class(settings.STORAGE)
+        file_dir = os.path.dirname(__file__)
+        file_path = os.path.abspath(os.path.join(file_dir, '../media/cache/js/a02847964696.js'))
+        actual_content = open(file_path, 'r').read().replace('\n', '')
+
+        self.assertEqual(expected_content.strip(' '), 
+                         actual_content.strip(' '))
+                         
+    def test_can_get_js_from_many_apps_from_project_and_inline(self):
+        template = u"""{% load compress %}{% compress js %}
+        <script src="/media/js/one.js" type="text/javascript"></script>
+        <script src="/media/core/js/test1.js" type="text/javascript"></script>
+        <script src="/media/otherapp/js/test1.js" type="text/javascript"></script>
+        <script type="text/javascript">
+            var testJsInline = '';
+        </script>
+        {% endcompress %}
+        """
+        context = { 'MEDIA_URL': settings.MEDIA_URL }
+        out = u'<script type="text/javascript" src="/media/CACHE/js/e815a380084d.js" charset="utf-8"></script>'
+        self.assertEqual(out, render(template, context))
+        
+        expected_content = u"""
+obj={};
+var test='abc';
+var test1='kpj';
+var testJsInline='';
+""".replace('\n', '').replace(' ', '')
+
+        storage = get_storage_class(settings.STORAGE)
+        file_dir = os.path.dirname(__file__)
+        file_path = os.path.abspath(os.path.join(file_dir, '../media/cache/js/e815a380084d.js'))
+        actual_content = open(file_path, 'r').read().replace('\n', '').replace(' ', '')
+
         self.assertEqual(expected_content.strip(' '), 
                          actual_content.strip(' '))
