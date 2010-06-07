@@ -5,12 +5,17 @@ from django.core.cache import cache
 from compressor import CssCompressor, JsCompressor
 from compressor.conf import settings
 
+
+OUTPUT_FILE = 'file'
+OUTPUT_INLINE = 'inline'
+
 register = template.Library()
 
 class CompressorNode(template.Node):
-    def __init__(self, nodelist, kind=None):
+    def __init__(self, nodelist, kind=None, mode=OUTPUT_FILE):
         self.nodelist = nodelist
         self.kind = kind
+        self.mode = mode
 
     def cache_get(self, key):
         packed_val = cache.get(key)
@@ -38,11 +43,15 @@ class CompressorNode(template.Node):
             compressor = CssCompressor(content)
         if self.kind == 'js':
             compressor = JsCompressor(content)
-        output = self.cache_get(compressor.cachekey)
+        cachekey = "%s-%s" % (compressor.cachekey, self.mode)
+        output = self.cache_get(cachekey)
         if output is None:
             try:
-                output = compressor.output()
-                self.cache_set(compressor.cachekey, output)
+                if self.mode == OUTPUT_FILE:
+                    output = compressor.output()
+                else:
+                    output = compressor.output_inline()
+                self.cache_set(cachekey, output)
             except:
                 from traceback import format_exc
                 raise Exception(format_exc())
@@ -92,11 +101,18 @@ def compress(parser, token):
 
     args = token.split_contents()
 
-    if not len(args) == 2:
-        raise template.TemplateSyntaxError("%r tag requires either 1, 3 or 5 arguments." % args[0])
+    if not len(args) in (2, 3):
+        raise template.TemplateSyntaxError("%r tag requires either one or two arguments." % args[0])
 
     kind = args[1]
     if not kind in ['css', 'js']:
         raise template.TemplateSyntaxError("%r's argument must be 'js' or 'css'." % args[0])
 
-    return CompressorNode(nodelist, kind)
+    if len(args) == 3:
+        mode = args[2]
+        if not mode in (OUTPUT_FILE, OUTPUT_INLINE):
+            raise template.TemplateSyntaxError("%r's second argument must be '%s' or '%s'." % (args[0], OUTPUT_FILE, OUTPUT_INLINE))
+    else:
+        mode = OUTPUT_FILE
+
+    return CompressorNode(nodelist, kind, mode)

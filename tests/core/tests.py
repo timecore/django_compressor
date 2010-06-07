@@ -3,6 +3,11 @@ import gzip
 
 from django.template import Template, Context, TemplateSyntaxError
 from django.test import TestCase
+from compressor import CssCompressor, JsCompressor
+from compressor.conf import settings
+from compressor.storage import CompressorFileStorage
+from compressor.utils import get_hexdigest, get_mtime
+
 from django.conf import settings as django_settings
 from django.core.files.storage import get_storage_class
 from BeautifulSoup import BeautifulSoup
@@ -30,12 +35,12 @@ class CompressorTestCase(TestCase):
 
     def test_css_split(self):
         out = [
-            ('file', os.path.join(settings.MEDIA_ROOT, u'css/one.css'), '<link rel="stylesheet" href="/media/css/one.css" type="text/css" charset="utf-8" />'),
-            ('hunk', u'p { border:5px solid green;}', '<style type="text/css">p { border:5px solid green;}</style>'),
-            ('file', os.path.join(settings.MEDIA_ROOT, u'css/two.css'), '<link rel="stylesheet" href="/media/css/two.css" type="text/css" charset="utf-8" />'),
+            ('file', os.path.join(settings.MEDIA_ROOT, u'css/one.css'), u'<link rel="stylesheet" href="/media/css/one.css" type="text/css" charset="utf-8" />'),
+            ('hunk', u'p { border:5px solid green;}', u'<style type="text/css">p { border:5px solid green;}</style>'),
+            ('file', os.path.join(settings.MEDIA_ROOT, u'css/two.css'), u'<link rel="stylesheet" href="/media/css/two.css" type="text/css" charset="utf-8" />'),
         ]
         split = self.cssNode.split_contents()
-        split = [(x[0], x[1], str(x[2])) for x in split]
+        split = [(x[0], x[1], self.cssNode.parser.elem_str(x[2])) for x in split]
         self.assertEqual(out, split)
 
     def test_css_hunks(self):
@@ -71,7 +76,7 @@ class CompressorTestCase(TestCase):
          ('hunk', u'obj.value = "value";', '<script type="text/javascript" charset="utf-8">obj.value = "value";</script>')
          ]
         split = self.jsNode.split_contents()
-        split = [(x[0], x[1], str(x[2])) for x in split]
+        split = [(x[0], x[1], self.jsNode.parser.elem_str(x[2])) for x in split]
         self.assertEqual(out, split)
 
     def test_js_hunks(self):
@@ -107,6 +112,26 @@ class CompressorTestCase(TestCase):
         self.assertEqual(output, JsCompressor(self.js).output())
         settings.OUTPUT_DIR = old_output_dir
 
+class LxmlCompressorTestCase(CompressorTestCase):
+
+    def test_css_split(self):
+        out = [
+            ('file', os.path.join(settings.MEDIA_ROOT, u'css/one.css'), u'<link rel="stylesheet" href="/media/css/one.css" type="text/css" charset="utf-8">'),
+            ('hunk', u'p { border:5px solid green;}', u'<style type="text/css">p { border:5px solid green;}</style>'),
+            ('file', os.path.join(settings.MEDIA_ROOT, u'css/two.css'), u'<link rel="stylesheet" href="/media/css/two.css" type="text/css" charset="utf-8">'),
+        ]
+        split = self.cssNode.split_contents()
+        split = [(x[0], x[1], self.cssNode.parser.elem_str(x[2])) for x in split]
+        self.assertEqual(out, split)
+
+    def setUp(self):
+        self.old_parser = settings.PARSER
+        settings.PARSER = 'compressor.parser.LxmlParser'
+        super(LxmlCompressorTestCase, self).setUp()
+
+    def tearDown(self):
+        settings.PARSER = self.old_parser
+
 class CssAbsolutizingTestCase(TestCase):
     def setUp(self):
         settings.COMPRESS = True
@@ -117,39 +142,44 @@ class CssAbsolutizingTestCase(TestCase):
         """
         self.cssNode = CssCompressor(self.css)
 
+    def get_hashed_mtime(self, filename, length=12):
+        filename = os.path.realpath(filename)
+        mtime = str(int(get_mtime(filename)))
+        return get_hexdigest(mtime)[:length]
+
     def test_css_absolute_filter(self):
         from compressor.filters.css_default import CssAbsoluteFilter
         filename = os.path.join(settings.MEDIA_ROOT, 'css/url/test.css')
         content = "p { background: url('../../images/image.gif') }"
-        output = "p { background: url('%simages/image.gif?275088b9bcf0') }" % settings.MEDIA_URL
+        output = "p { background: url('%simages/image.gif?%s') }" % (settings.MEDIA_URL, self.get_hashed_mtime(filename))
         filter = CssAbsoluteFilter(content)
         self.assertEqual(output, filter.input(filename=filename))
         settings.MEDIA_URL = 'http://media.example.com/'
         filename = os.path.join(settings.MEDIA_ROOT, 'css/url/test.css')
-        output = "p { background: url('%simages/image.gif?275088b9bcf0') }" % settings.MEDIA_URL
+        output = "p { background: url('%simages/image.gif?%s') }" % (settings.MEDIA_URL, self.get_hashed_mtime(filename))
         self.assertEqual(output, filter.input(filename=filename))
 
     def test_css_absolute_filter_https(self):
         from compressor.filters.css_default import CssAbsoluteFilter
         filename = os.path.join(settings.MEDIA_ROOT, 'css/url/test.css')
         content = "p { background: url('../../images/image.gif') }"
-        output = "p { background: url('%simages/image.gif?275088b9bcf0') }" % settings.MEDIA_URL
+        output = "p { background: url('%simages/image.gif?%s') }" % (settings.MEDIA_URL, self.get_hashed_mtime(filename))
         filter = CssAbsoluteFilter(content)
         self.assertEqual(output, filter.input(filename=filename))
         settings.MEDIA_URL = 'https://media.example.com/'
         filename = os.path.join(settings.MEDIA_ROOT, 'css/url/test.css')
-        output = "p { background: url('%simages/image.gif?275088b9bcf0') }" % settings.MEDIA_URL
+        output = "p { background: url('%simages/image.gif?%s') }" % (settings.MEDIA_URL, self.get_hashed_mtime(filename))
         self.assertEqual(output, filter.input(filename=filename))
 
     def test_css_absolute_filter_relative_path(self):
         from compressor.filters.css_default import CssAbsoluteFilter
         filename = os.path.join(django_settings.TEST_DIR, 'whatever', '..', 'media', 'whatever/../css/url/test.css')
         content = "p { background: url('../../images/image.gif') }"
-        output = "p { background: url('%simages/image.gif?275088b9bcf0') }" % settings.MEDIA_URL
+        output = "p { background: url('%simages/image.gif?%s') }" % (settings.MEDIA_URL, self.get_hashed_mtime(filename))
         filter = CssAbsoluteFilter(content)
         self.assertEqual(output, filter.input(filename=filename))
         settings.MEDIA_URL = 'https://media.example.com/'
-        output = "p { background: url('%simages/image.gif?275088b9bcf0') }" % settings.MEDIA_URL
+        output = "p { background: url('%simages/image.gif?%s') }" % (settings.MEDIA_URL, self.get_hashed_mtime(filename))
         self.assertEqual(output, filter.input(filename=filename))
 
 
@@ -197,7 +227,7 @@ class CssMediaTestCase(TestCase):
         media = [u'screen', u'print', u'all', None, u'print']
         links = BeautifulSoup(node.output()).findAll('link')
         self.assertEqual(media, [l.get('media', None) for l in links])
-        
+
 
 class CssMinTestCase(TestCase):
     def test_cssmin_filter(self):
