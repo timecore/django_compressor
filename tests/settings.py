@@ -14,6 +14,7 @@ DATABASE_NAME = 'django_compressor_tests.db'
  
 INSTALLED_APPS = [
     'core',
+    'otherapp',
     'compressor',
 ]
 TEMPLATE_LOADERS = (

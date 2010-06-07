@@ -4,6 +4,7 @@ import gzip
 from django.template import Template, Context, TemplateSyntaxError
 from django.test import TestCase
 from django.conf import settings as django_settings
+from django.core.files.storage import get_storage_class
 from BeautifulSoup import BeautifulSoup
 
 from compressor import CssCompressor, JsCompressor
@@ -341,3 +342,53 @@ class AppSavvyStorageTestCase(TestCase):
         context = { 'MEDIA_URL': settings.MEDIA_URL }
         out = u'<link rel="stylesheet" href="/media/CACHE/css/5dbaaa331670.css" type="text/css" charset="utf-8" />'
         self.assertEqual(out, render(template, context))
+
+    def test_can_get_css_from_one_app(self):
+        template = u"""{% load compress %}{% compress css %}
+        <link rel="stylesheet" href="/media/core/css/test.css" type="text/css" charset="utf-8">
+        {% endcompress %}
+        """
+        context = { 'MEDIA_URL': settings.MEDIA_URL }
+        out = u'<link rel="stylesheet" href="/media/CACHE/css/553cd2310726.css" type="text/css" charset="utf-8" />'
+        self.assertEqual(out, render(template, context))
+        
+        expected_content = u"""
+body {
+    margin: 0px;
+}
+        """.replace('\n', '')
+
+        storage = get_storage_class(settings.STORAGE)
+        file_dir = os.path.dirname(__file__)
+        file_path = os.path.abspath(os.path.join(file_dir, '../media/cache/css/553cd2310726.css'))
+        actual_content = open(file_path, 'r').read().replace('\n', '')
+
+        self.assertEqual(expected_content.strip(' '), 
+                         actual_content.strip(' '))
+
+    def test_can_get_css_from_many_apps(self):
+        template = u"""{% load compress %}{% compress css %}
+        <link rel="stylesheet" href="/media/core/css/test.css" type="text/css" charset="utf-8">
+        <link rel="stylesheet" href="/media/otherapp/css/test2.css" type="text/css" charset="utf-8">
+        {% endcompress %}
+        """
+        context = { 'MEDIA_URL': settings.MEDIA_URL }
+        out = u'<link rel="stylesheet" href="/media/CACHE/css/d191838f3e88.css" type="text/css" charset="utf-8" />'
+        self.assertEqual(out, render(template, context))
+        
+        expected_content = u"""
+body {
+    margin: 0px;
+}
+body {
+    background: red;
+}
+        """.replace('\n', '')
+
+        storage = get_storage_class(settings.STORAGE)
+        file_dir = os.path.dirname(__file__)
+        file_path = os.path.abspath(os.path.join(file_dir, '../media/cache/css/d191838f3e88.css'))
+        actual_content = open(file_path, 'r').read().replace('\n', '')
+
+        self.assertEqual(expected_content.strip(' '), 
+                         actual_content.strip(' '))
