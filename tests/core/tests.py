@@ -422,3 +422,43 @@ body {
 
         self.assertEqual(expected_content.strip(' '), 
                          actual_content.strip(' '))
+
+    def test_can_get_css_from_many_apps_from_project_and_inline(self):
+        template = u"""{% load compress %}{% compress css %}
+        <link rel="stylesheet" href="{{ MEDIA_URL }}css/one.css" type="text/css" charset="utf-8">
+        <style type="text/css">p { border:6px solid white;}</style>
+        <link rel="stylesheet" href="{{ MEDIA_URL }}css/two.css" type="text/css" charset="utf-8">
+        <link rel="stylesheet" href="/media/core/css/test.css" type="text/css" charset="utf-8">
+        <link rel="stylesheet" href="/media/otherapp/css/test2.css" type="text/css" charset="utf-8">
+        {% endcompress %}
+        """
+        context = { 'MEDIA_URL': settings.MEDIA_URL }
+        out = u'<link rel="stylesheet" href="/media/CACHE/css/5b3a1d97baec.css" type="text/css" charset="utf-8" />'
+        self.assertEqual(out, render(template, context))
+        
+        expected_content = u"""
+body {
+ background:#990;
+}
+p {
+ border:6px solid white;
+}
+body {
+ color:#fff;
+}
+body {
+    margin: 0px;
+}
+body {
+    background: red;
+}
+""".replace('\n', '').replace(' ', '')
+
+        storage = get_storage_class(settings.STORAGE)
+        file_dir = os.path.dirname(__file__)
+        file_path = os.path.abspath(os.path.join(file_dir, '../media/cache/css/5b3a1d97baec.css'))
+        actual_content = open(file_path, 'r').read().replace('\n', '').replace(' ', '')
+
+        import pdb;pdb.set_trace()
+        self.assertEqual(expected_content.strip(' '), 
+                         actual_content.strip(' '))
