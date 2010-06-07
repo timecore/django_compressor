@@ -187,6 +187,16 @@ The amount of time (in seconds) to cache the result of the check of the
 modification timestamp of a file. Disabled by default. Should be smaller
 than ``COMPRESS_REBUILD_TIMEOUT`` and ``COMPRESS_MINT_DELAY``.
 
+What if I have my media spread through many apps?
+*************************************************
+
+You can use the AppSavvyCompressorFileStorage, which tries to find media using the following order:
+
+    * First looks in your media folder as specified by MEDIA_PATH in your settings file.
+    * Then it looks in every app /media folder in the same order as the apps are specified in your INSTALLED_APPS setting.
+    * If none found then you get an error.
+
+To use it, just change the setting 'COMPRESS_STORAGE' to 'compressor.storage.AppSavvyCompressorFileStorage' and you are done.
 
 Dependencies
 ************
@@ -206,3 +216,4 @@ Dependencies
 .. _BeautifulSoup: http://www.crummy.com/software/BeautifulSoup/
 .. _lxml: http://codespeak.net/lxml/
 .. _libxml2: http://xmlsoft.org/
+
