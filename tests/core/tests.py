@@ -3,14 +3,12 @@ import gzip
 
 from django.template import Template, Context, TemplateSyntaxError
 from django.test import TestCase
-from compressor import CssCompressor, JsCompressor
-from compressor.conf import settings
-from compressor.storage import CompressorFileStorage
-
 from django.conf import settings as django_settings
-
 from BeautifulSoup import BeautifulSoup
 
+from compressor import CssCompressor, JsCompressor
+from compressor.conf import settings
+from compressor.storage import CompressorFileStorage, AppSavvyCompressorFileStorage
 
 class CompressorTestCase(TestCase):
 
@@ -322,4 +320,24 @@ class StorageTestCase(TestCase):
         """
         context = { 'MEDIA_URL': settings.MEDIA_URL }
         out = u'<link rel="stylesheet" href="/media/CACHE/css/5b231a62e9a6.css.gz" type="text/css" charset="utf-8" />'
+        self.assertEqual(out, render(template, context))
+
+class AppSavvyStorageTestCase(TestCase):
+    def setUp(self):
+        self._storage = settings.STORAGE
+        settings.STORAGE = 'compressor.storage.AppSavvyCompressorFileStorage'
+        settings.COMPRESS = True
+
+    def tearDown(self):
+        settings.STORAGE = self._storage
+
+    def test_css_tag_with_app_savvy_storage(self):
+        template = u"""{% load compress %}{% compress css %}
+        <link rel="stylesheet" href="{{ MEDIA_URL }}css/one.css" type="text/css" charset="utf-8">
+        <style type="text/css">p { border:6px solid white;}</style>
+        <link rel="stylesheet" href="{{ MEDIA_URL }}css/two.css" type="text/css" charset="utf-8">
+        {% endcompress %}
+        """
+        context = { 'MEDIA_URL': settings.MEDIA_URL }
+        out = u'<link rel="stylesheet" href="/media/CACHE/css/5dbaaa331670.css" type="text/css" charset="utf-8" />'
         self.assertEqual(out, render(template, context))
