@@ -43,7 +43,7 @@ class AppSavvyCompressorFileStorage(CompressorFileStorage):
             base_url = settings.MEDIA_URL
         super(AppSavvyCompressorFileStorage, self).__init__(location,
                                                             base_url,
-                                                            *args, 
+                                                            *args,
                                                             **kwargs)
 
     def _open(self, name, mode='rb'):
@@ -72,17 +72,14 @@ class AppSavvyCompressorFileStorage(CompressorFileStorage):
     def exists(self, name):
         if os.path.exists(os.path.join(self.location, name)):
             return True
-    
+
         paths = self.get_media_paths()
 
-        try:
-            for app, media_path in paths:
-                if os.path.exists(os.path.join(media_path, name)):
-                    return True
+        for app, media_path in paths:
+            if os.path.exists(os.path.join(media_path, name)):
+                return True
 
-            return False
-        except Exception, err:
-            import pdb;pdb.set_trace()
+        return False
 
     def get_media_paths(self):
         paths = []
